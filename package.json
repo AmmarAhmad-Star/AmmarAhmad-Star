@@ -1,0 +1,12 @@
+{
+  "name": "arcade-bot",
+  "version": "1.0.0",
+  "description": "Discord Arcade Bot with global command support for all servers",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3"
+  }
+}
