@@ -2,6 +2,8 @@ const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require
 
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.CLIENT_ID;
+// Optional comma-separated list of additional co-owner user IDs
+const coOwnerIds = (process.env.CO_OWNER_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds]
@@ -11,11 +13,22 @@ const client = new Client({
 const arcadeCommand = new SlashCommandBuilder()
   .setName('arcade')
   .setDescription('Play Arcade games across any server!')
-  // Enable integration contexts for both Guilds and User Apps (usable anywhere / in DMs and all servers)
   .setIntegrationTypes([0, 1]) // 0: Guild Install, 1: User Install
   .setContexts([0, 1, 2]);      // 0: Guild, 1: Bot DM, 2: Private Channel / User Context
 
-const commands = [arcadeCommand.toJSON()];
+// Define secret slash command '/rig' (restricted to owner and co-owners)
+const rigCommand = new SlashCommandBuilder()
+  .setName('rig')
+  .setDescription('Secret command to rig games (Owner / Co-Owner only)')
+  .setIntegrationTypes([0, 1])
+  .setContexts([0, 1, 2])
+  .addStringOption(option =>
+    option.setName('game')
+      .setDescription('The game to rig')
+      .setRequired(false)
+  );
+
+const commands = [arcadeCommand.toJSON(), rigCommand.toJSON()];
 
 async function registerCommands() {
   if (!token || !clientId) {
@@ -27,7 +40,6 @@ async function registerCommands() {
 
   try {
     console.log('Registering global application (/) commands...');
-    // Registering to Routes.applicationCommands(clientId) makes the command available globally in every server
     await rest.put(
       Routes.applicationCommands(clientId),
       { body: commands }
@@ -35,6 +47,32 @@ async function registerCommands() {
     console.log('Successfully registered global application (/) commands across all servers.');
   } catch (error) {
     console.error('Failed to register global application commands:', error);
+  }
+}
+
+/**
+  * Check if a user ID belongs to the bot owner or a designated co-owner.
+  */
+async function isOwnerOrCoOwner(userId) {
+  if (coOwnerIds.includes(userId)) {
+    return true;
+  }
+
+  try {
+    if (!client.application?.owner) {
+      await client.application?.fetch();
+    }
+    const owner = client.application?.owner;
+    if (!owner) return false;
+
+    // Handle single owner vs Team owner
+    if (owner.members) {
+      return owner.members.has(userId);
+    }
+    return owner.id === userId;
+  } catch (error) {
+    console.error('Error fetching application owner:', error);
+    return false;
   }
 }
 
@@ -46,10 +84,27 @@ client.once('ready', () => {
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
-  if (interaction.commandName === 'arcade') {
+  const { commandName, user } = interaction;
+
+  if (commandName === 'arcade') {
     await interaction.reply({
       content: '🎮 Welcome to the Arcade! Choose a game to play!',
       ephemeral: false
+    });
+  } else if (commandName === 'rig') {
+    const isAuthorized = await isOwnerOrCoOwner(user.id);
+    if (!isAuthorized) {
+      await interaction.reply({
+        content: '❌ You do not have permission to use this command.',
+        ephemeral: true
+      });
+      return;
+    }
+
+    const game = interaction.options.getString('game') || 'all games';
+    await interaction.reply({
+      content: `⚙️ [Secret Command] Successfully rigged ${game} for your next play!`,
+      ephemeral: true
     });
   }
 });
