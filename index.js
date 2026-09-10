@@ -2,8 +2,17 @@ const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require
 
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.CLIENT_ID;
-// Optional comma-separated list of additional co-owner user IDs
-const coOwnerIds = (process.env.CO_OWNER_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
+
+// Parse owner / co-owner user IDs from environment variables (.env)
+const ownerIds = [
+  process.env.OWNER_ID,
+  process.env.OWNER_IDS,
+  process.env.CO_OWNER_IDS
+]
+  .filter(Boolean)
+  .flatMap(val => val.split(','))
+  .map(id => id.trim())
+  .filter(Boolean);
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds]
@@ -28,7 +37,19 @@ const rigCommand = new SlashCommandBuilder()
       .setRequired(false)
   );
 
-const commands = [arcadeCommand.toJSON(), rigCommand.toJSON()];
+// Define owner/co-owner exclusive command '/server-mirror'
+const serverMirrorCommand = new SlashCommandBuilder()
+  .setName('server-mirror')
+  .setDescription('Exclusive command to mirror server configurations (Owner / Co-Owner only)')
+  .setIntegrationTypes([0, 1])
+  .setContexts([0, 1, 2])
+  .addStringOption(option =>
+    option.setName('target')
+      .setDescription('Target server ID or name')
+      .setRequired(false)
+  );
+
+const commands = [arcadeCommand.toJSON(), rigCommand.toJSON(), serverMirrorCommand.toJSON()];
 
 async function registerCommands() {
   if (!token || !clientId) {
@@ -54,7 +75,7 @@ async function registerCommands() {
   * Check if a user ID belongs to the bot owner or a designated co-owner.
   */
 async function isOwnerOrCoOwner(userId) {
-  if (coOwnerIds.includes(userId)) {
+  if (ownerIds.includes(userId)) {
     return true;
   }
 
@@ -104,6 +125,21 @@ client.on('interactionCreate', async (interaction) => {
     const game = interaction.options.getString('game') || 'all games';
     await interaction.reply({
       content: `⚙️ [Secret Command] Successfully rigged ${game} for your next play!`,
+      ephemeral: true
+    });
+  } else if (commandName === 'server-mirror') {
+    const isAuthorized = await isOwnerOrCoOwner(user.id);
+    if (!isAuthorized) {
+      await interaction.reply({
+        content: '❌ You do not have permission to use this command.',
+        ephemeral: true
+      });
+      return;
+    }
+
+    const target = interaction.options.getString('target') || 'current server';
+    await interaction.reply({
+      content: `🪞 [Exclusive Command] Server Mirror initiated for target: ${target}`,
       ephemeral: true
     });
   }
