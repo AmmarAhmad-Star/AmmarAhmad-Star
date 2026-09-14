@@ -1,4 +1,4 @@
-- 👋 Hi, I’m @AmmarAhmad-Star
+- 👋 Hi, I'm Nene
 - 👀 I’m interested in Coding & animataion
 - 🌱 I’m currently learning Html and Css
 - ⚡ Fun fact: My father is a Chief I.T manager and I'm deeply inspired by him that why while being at the age of 13 I plan to learn advance Coding :)
